@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Cross-Account CodePipeline sample
+Parameters:
+Parameters:
+  GithubOauthToken:
+    Type: String
+    Description: see http://docs.aws.amazon.com/codepipeline/latest/userguide/integrations-action-type.html for instructions
+  GithubRepoOwner:
+    Type: String
+    Description: The Github owner of the repository
+  GithubRepoName:
+    Type: String
+    Description: The GitHub repository where the Terraform files (to be executed) are located
+  GithubRepoBranch:
+    Type: String
+    Default: master
+    Description: The Git branch to be used
+  AccountIdStaging:
+    Type: String
+    Description: AWS Account ID of the staging account
+  AccountIdProduction:
+    Type: String
+    Description: AWS Account ID of the production account
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Source Code Repository
+        Parameters:
+          - GithubRepoOwner
+          - GithubRepoName
+          - GithubRepoBranch
+          - GithubOauthToken
+Resources:
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+  ArtifactStoreKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS:
+            - !Ref PipelineRole
+          Action:
+          - "kms:Encrypt"
+          - "kms:Decrypt"
+          - "kms:ReEncrypt*"
+          - "kms:GenerateDataKey*"
+          - "kms:DescribeKey"
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipelineRole.Arn
+      ArtifactStore:
+        Location: !Ref ArtifactStoreBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              InputArtifacts: []
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                Owner: !Ref GithubRepoOwner
+                Repo: !Ref GithubRepoName
+                Branch: !Ref GithubRepoBranch
+                OAuthToken: !Ref GithubOauthToken
+              RunOrder: 1
+
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
