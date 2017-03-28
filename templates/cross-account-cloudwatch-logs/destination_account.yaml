@@ -1,0 +1,62 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+
+  AllowedSourceAccountIds:
+    Type: CommaDelimitedList
+
+Resources:
+
+  KinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      ShardCount: 1
+
+  CloudWatchLogsToKinesisRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-CloudWatchLogsToKinesis"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: 1
+          Effect: Allow
+          Principal:
+            Service: !Sub 'logs.${AWS::Region}.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Policies:
+      - PolicyName: allow-kinesis-write-access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: kinesis:PutRecord
+            Resource: !GetAtt KinesisStream.Arn
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-CloudWatchLogsToKinesis"
+
+  CloudWatchDestination:
+    Type: AWS::Logs::Destination
+    Properties:
+      DestinationName: cross-account-destination
+      RoleArn: !GetAtt CloudWatchLogsToKinesisRole.Arn
+      TargetArn: !GetAtt KinesisStream.Arn
+      DestinationPolicy: !Sub
+      - |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "1",
+              "Effect": "Allow",
+              "Principal" : {
+                "AWS" : ["${AllowedSourceAccountIdsList}"]
+              },
+              "Action": "logs:PutSubscriptionFilter",
+              "Resource": "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:destination:cross-account-destination"
+            }
+          ]
+        }
+      - AllowedSourceAccountIdsList: !Join ['","', !Ref AllowedSourceAccountIds]
