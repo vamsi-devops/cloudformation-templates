@@ -41,19 +41,55 @@ Resources:
     Type: AWS::KMS::Key
     Properties:
       EnableKeyRotation: true
-      KeyPolicy:
-        Version: "2012-10-17"
-        Statement:
-        - Effect: Allow
-          Principal:
-            AWS:
-            - !Ref PipelineRole
-          Action:
-          - "kms:Encrypt"
-          - "kms:Decrypt"
-          - "kms:ReEncrypt*"
-          - "kms:GenerateDataKey*"
-          - "kms:DescribeKey"
+      KeyPolicy: |
+        {
+          "Version": "2012-10-17",
+          "Id": "key-consolepolicy-3",
+          "Statement": [
+            {
+              "Sid": "Allow use of the key",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": [
+                  "arn:aws:iam::336007894976:role/codepipeline-cross-account-experiment-PipelineRole-U9ZKEIASK2VX",
+                  "arn:aws:iam::255296336815:root"
+                ]
+              },
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*"
+            }
+          ]
+        },
+        {
+          "Sid": "Allow access for Key Administrators",
+          "Effect": "Allow",
+          "Principal": {
+            "AWS": "arn:aws:iam::336007894976:user/soenke"
+          },
+          "Action": [
+            "kms:Create*",
+            "kms:Describe*",
+            "kms:Enable*",
+            "kms:List*",
+            "kms:Put*",
+            "kms:Update*",
+            "kms:Revoke*",
+            "kms:Disable*",
+            "kms:Get*",
+            "kms:Delete*",
+            "kms:TagResource",
+            "kms:UntagResource",
+            "kms:ScheduleKeyDeletion",
+            "kms:CancelKeyDeletion"
+          ],
+          "Resource": "*"
+        }
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
