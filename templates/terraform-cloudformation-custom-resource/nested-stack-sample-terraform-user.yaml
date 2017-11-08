@@ -1,0 +1,50 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Sample template which provisions a CloudFront Origin Access Control
+Resources:
+  TerraformExecutionStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        AWS CloudFormation Stack Parameters
+      Tags:
+        - Resource Tag
+      TemplateURL: https://s3.amazonaws.com/ruempler-cloudformation-templates-prod/terraform-cloudformation-custom-resource/nested-stack-custom-resource-provider.yaml
+  TerraformExecutionPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: AllowCloudFrontAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+            - cloudfront:*
+      Roles:
+      - !GetAtt TerraformExecutionStack.TerraFormExecuteFunctionRole
+
+  CdnOriginAccessIdentity:
+    DependsOn: TerraFormExecuteFunction
+    Type: Custom::TerraFormExecute
+    Properties:
+      ServiceToken: !GetAtt TerraFormExecuteFunction.Arn
+      Terraform: !Sub |
+        terraform {
+          backend "s3" {
+            bucket = "${TerraFormStateStorage}"
+            key    = "CdnOriginAccessIdentity.tfstate"
+            region = "${AWS::Region}"
+          }
+        }
+
+        resource "aws_cloudfront_origin_access_identity" "origin_access_identity" {
+          comment = "I am a resource managed by Terraform!"
+        }
+
+        output "cloudfront_oia_arn" {
+          value = "${!aws_cloudfront_origin_access_identity.origin_access_identity.iam_arn}"
+        }
+
+        output "cloudfront_oia_path" {
+          value = "${!aws_cloudfront_origin_access_identity.origin_access_identity.cloudfront_access_identity_path}"
+        }
