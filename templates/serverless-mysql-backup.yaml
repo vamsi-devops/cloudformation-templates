@@ -1,12 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: 'AWS::Serverless-2016-10-31'
-Description: Schedule an arbitrary command with AWS CodeBuild. Powered by github.com/s0enke/cloudformation-templates
 
 Parameters:
-  Command:
-    Type: String
-    Default: "echo 'Hello World'"
-    Description: The command to be executed.
+
   Image:
     Type: String
     Default: "aws/codebuild/eb-nodejs-4.4.6-amazonlinux-64:2.1.3"
@@ -17,11 +13,29 @@ Parameters:
     Default: 'rate(5 minutes)'
     Description: cron and rate syntax allowed.
 
+  VpcId:
+    Type: String
+    Description: Optional VPC ID if the code should run in a VPC
+    Default: ''
+  VpcSubnetIds:
+    Type: String
+    Description: Optional VPC Subnet IDs if the code should run in a VPC, comma separated
+    Default: ''
+  VpcSecurityGroupIds:
+    Type: String
+    Description: Optional VPC SecurityGroup Ids if the code should run in a VPC, comma separated
+    Default: ''
+
+Conditions:
+  HasVpcConfig: !Not [!Equals [!Ref VpcId, ""]]
+
 Resources:
 
   ExecutionRuntime:
     Type: AWS::CodeBuild::Project
     Properties:
+      VpcConfig:
+        !If [HasVpcConfig, {VpcId: !Ref VpcId, Subnets: !Split [',', !Ref VpcSubnetIds], SecurityGroupIds: !Split [',', !Ref VpcSecurityGroupIds]}, !Ref 'AWS::NoValue']
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -36,7 +50,7 @@ Resources:
           phases:
             build:
               commands:
-              - ${Command}
+              - mysqldump -h soenketest.cluster-cqacpgdeinqk.eu-west-1.rds.amazonaws.com -u soenketest -psoenketest --all-databases
 
   ExecutionRuntimeRole:
     Type: AWS::IAM::Role
@@ -49,8 +63,16 @@ Resources:
             Service: codebuild.amazonaws.com
           Action: sts:AssumeRole
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole # Allow to log
-
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole # Allow to log and run in VPC
+      - arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess  # Allow to access VPC details
+      Policies:
+      - PolicyName: AllowCodeBuildENIAttachment
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: ec2:CreateNetworkInterfacePermission
+            Resource: '*'
   Trigger:
     Type: AWS::Events::Rule
     Properties:
