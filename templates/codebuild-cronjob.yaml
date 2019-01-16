@@ -17,11 +17,30 @@ Parameters:
     Default: 'rate(5 minutes)'
     Description: cron and rate syntax allowed.
 
+  VpcId:
+    Type: String
+    Description: Optional VPC ID if the code should run in a VPC
+    Default: ''
+  VpcSubnetIds:
+    Type: String
+    Description: Optional VPC Subnet IDs if the code should run in a VPC, comma separated
+    Default: ''
+  VpcSecurityGroupIds:
+    Type: String
+    Description: Optional VPC SecurityGroup Ids if the code should run in a VPC, comma separated
+    Default: ''
+
+Conditions:
+  HasVpcConfig: !Not [!Equals [!Ref VpcId, ""]]
+
+
 Resources:
 
   ExecutionRuntime:
     Type: AWS::CodeBuild::Project
     Properties:
+      VpcConfig:
+        !If [HasVpcConfig, {VpcId: !Ref VpcId, Subnets: !Split [',', !Ref VpcSubnetIds], SecurityGroupIds: !Split [',', !Ref VpcSecurityGroupIds]}, !Ref 'AWS::NoValue']
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -49,8 +68,19 @@ Resources:
             Service: codebuild.amazonaws.com
           Action: sts:AssumeRole
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole # Allow to log
-
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole # Allow to log and run in VPC
+      #- arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess  # Allow to access VPC details
+      Policies:
+      - If
+        - HasVpcConfig
+        - PolicyName: AllowCodeBuildENIAttachment
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action: ec2:CreateNetworkInterfacePermission
+              Resource: '*'
+        - !Ref AWS::NoValue
   Trigger:
     Type: AWS::Events::Rule
     Properties:
