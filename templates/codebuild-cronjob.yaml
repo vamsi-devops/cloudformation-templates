@@ -2,6 +2,18 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: 'AWS::Serverless-2016-10-31'
 Description: Schedule an arbitrary command with AWS CodeBuild. Powered by github.com/s0enke/cloudformation-templates
 
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: ServerlessCron
+    Description: 'Run arbitrary commands with this "serverless cron": Powered by CloudWatch Events and CodeBuild, you only pay when the cron gets invoked. No idling servers!'
+    Author: Soenke Ruempler
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    HomePageUrl: https://github.com/s0enke/cloudformation-templates
+    SemanticVersion: 0.0.3
+    SourceCodeUrl: https://github.com/s0enke/cloudformation-templates
+
 Parameters:
   Command:
     Type: String
